@@ -9,7 +9,7 @@ using namespace cv;
 
 /** Function Headers */
 vector<int> detectAndDisplay(Mat frame);
-Point findPupil(Mat eye);
+Point findPupil(Mat eye, int verticalOffset);
 void updateMousePosition(const Point& gazeDirection, int screenWidth, int screenHeight);
 
 /** Global variables */
@@ -50,6 +50,10 @@ int main(int argc, const char** argv)
     int centerX = screenMode.w / 2;
     int centerY = screenMode.h / 2;
 
+    // Create SDL window and renderer
+    SDL_Window* window = SDL_CreateWindow("Eyes Tracker", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenMode.w, screenMode.h, SDL_WINDOW_SHOWN);
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+
     int camera_device = 0;
     VideoCapture capture;
     capture.open(camera_device);
@@ -58,6 +62,8 @@ int main(int argc, const char** argv)
     if (!capture.isOpened())
     {
         cout << "--(!)Error opening video capture\n";
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
         SDL_Quit();
         return -1;
     }
@@ -95,9 +101,23 @@ int main(int argc, const char** argv)
         // Update mouse position based on gaze direction
         Point gazeDirection(gazeData[0], gazeData[1]);
         updateMousePosition(gazeDirection, screenMode.w, screenMode.h);
+
+        // Clear renderer
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_RenderClear(renderer);
+
+        // Draw green dot at mouse position
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_Rect dotRect = { mouseX, mouseY, 5, 5 };
+        SDL_RenderFillRect(renderer, &dotRect);
+
+        // Render to window
+        SDL_RenderPresent(renderer);
     }
 
     // Cleanup and quit SDL
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
     SDL_Quit();
 
     return 0;
@@ -144,7 +164,8 @@ vector<int> detectAndDisplay(Mat frame_gray)
             Mat eyeROI = faceROI(eye);
             Mat filtered_eyeROI = filtered_faceROI(eye);
 
-            Point pupil = findPupil(filtered_eyeROI);
+            int verticalOffset = 55; // Adjust this value according to the actual offset
+            Point pupil = findPupil(filtered_eyeROI, verticalOffset);
             Point gazeDirection = Point(eyeROI.cols / 2, eyeROI.rows / 2) - pupil;
 
             int gaze = 0;
@@ -166,7 +187,7 @@ vector<int> detectAndDisplay(Mat frame_gray)
     return {-1, -1, -1}; // Return -1 when no eye detected
 }
 
-Point findPupil(Mat eye)
+Point findPupil(Mat eye, int verticalOffset)
 {
     // Apply adaptive thresholding
     Mat bw;
@@ -179,6 +200,9 @@ Point findPupil(Mat eye)
     // Find the center of gravity
     Moments mu = moments(bw, true);
     Point center(mu.m10 / mu.m00, mu.m01 / mu.m00);
+
+    // Apply vertical offset
+    center.y += verticalOffset;
 
     return center;
 }
@@ -194,7 +218,4 @@ void updateMousePosition(const Point& gazeDirection, int screenWidth, int screen
     // Limiter les coordonnées du curseur de la souris à l'écran
     mouseX = max(0, min(screenWidth - 1, mouseX));
     mouseY = max(0, min(screenHeight - 1, mouseY));
-
-    // Mettre à jour la position du curseur de la souris en utilisant SDL
-    SDL_WarpMouseInWindow(NULL, mouseX, mouseY);
 }
