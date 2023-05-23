@@ -2,6 +2,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include <SDL2/SDL.h>
 
 using namespace std;
 using namespace cv;
@@ -9,11 +10,14 @@ using namespace cv;
 /** Function Headers */
 vector<int> detectAndDisplay(Mat frame);
 Point findPupil(Mat eye);
+void updateMousePosition(const Point& gazeDirection, int screenWidth, int screenHeight);
 
 /** Global variables */
 String face_cascade_name, eyes_cascade_name;
 CascadeClassifier face_cascade;
 CascadeClassifier eyes_cascade;
+int mouseX = 0;
+int mouseY = 0;
 
 int main(int argc, const char** argv)
 {
@@ -26,6 +30,26 @@ int main(int argc, const char** argv)
         return -1;
     }
 
+    // Initialize SDL for mouse events
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
+        cout << "Failed to initialize SDL: " << SDL_GetError() << endl;
+        return -1;
+    }
+
+    // Get the screen information
+    SDL_DisplayMode screenMode;
+    if (SDL_GetDesktopDisplayMode(0, &screenMode) != 0)
+    {
+        cout << "Failed to get screen information: " << SDL_GetError() << endl;
+        SDL_Quit();
+        return -1;
+    }
+
+    // Calculate the center coordinates
+    int centerX = screenMode.w / 2;
+    int centerY = screenMode.h / 2;
+
     int camera_device = 0;
     VideoCapture capture;
     capture.open(camera_device);
@@ -34,6 +58,7 @@ int main(int argc, const char** argv)
     if (!capture.isOpened())
     {
         cout << "--(!)Error opening video capture\n";
+        SDL_Quit();
         return -1;
     }
 
@@ -66,11 +91,17 @@ int main(int argc, const char** argv)
                 cout << ", ";
         }
         cout << "]\n";
+
+        // Update mouse position based on gaze direction
+        Point gazeDirection(gazeData[0], gazeData[1]);
+        updateMousePosition(gazeDirection, screenMode.w, screenMode.h);
     }
+
+    // Cleanup and quit SDL
+    SDL_Quit();
 
     return 0;
 }
-
 
 vector<int> detectAndDisplay(Mat frame_gray)
 {
@@ -135,7 +166,6 @@ vector<int> detectAndDisplay(Mat frame_gray)
     return {-1, -1, -1}; // Return -1 when no eye detected
 }
 
-
 Point findPupil(Mat eye)
 {
     // Apply adaptive thresholding
@@ -151,4 +181,20 @@ Point findPupil(Mat eye)
     Point center(mu.m10 / mu.m00, mu.m01 / mu.m00);
 
     return center;
+}
+
+void updateMousePosition(const Point& gazeDirection, int screenWidth, int screenHeight)
+{
+    const int mouseSpeed = 10; // Réglage de la vitesse de mouvement du curseur
+
+    // Mise à jour des coordonnées X et Y du curseur de la souris en fonction du regard
+    mouseX += gazeDirection.x * mouseSpeed;
+    mouseY += gazeDirection.y * mouseSpeed;
+
+    // Limiter les coordonnées du curseur de la souris à l'écran
+    mouseX = max(0, min(screenWidth - 1, mouseX));
+    mouseY = max(0, min(screenHeight - 1, mouseY));
+
+    // Mettre à jour la position du curseur de la souris en utilisant SDL
+    SDL_WarpMouseInWindow(NULL, mouseX, mouseY);
 }
