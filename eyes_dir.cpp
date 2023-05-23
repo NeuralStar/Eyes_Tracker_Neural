@@ -18,6 +18,7 @@ CascadeClassifier face_cascade;
 CascadeClassifier eyes_cascade;
 int mouseX = 0;
 int mouseY = 0;
+Point previousPupil(-1, -1); // Coordonnées précédentes de la pupille
 
 int main(int argc, const char** argv)
 {
@@ -103,6 +104,7 @@ int main(int argc, const char** argv)
     return 0;
 }
 
+
 vector<int> detectAndDisplay(Mat frame_gray)
 {
     //-- Convert frame_gray to HUV color space
@@ -126,6 +128,8 @@ vector<int> detectAndDisplay(Mat frame_gray)
         return {-1, -1, -1}; // No face detected
     }
 
+    Point pupil(-1, -1); // Initialiser les coordonnées de la pupille à (-1, -1)
+
     for (const auto& face : faces)
     {
         //-- In each face, detect eyes
@@ -144,8 +148,13 @@ vector<int> detectAndDisplay(Mat frame_gray)
             Mat eyeROI = faceROI(eye);
             Mat filtered_eyeROI = filtered_faceROI(eye);
 
-            Point pupil = findPupil(filtered_eyeROI);
-            Point gazeDirection = Point(eyeROI.cols / 2, eyeROI.rows / 2) - pupil;
+            Point currentPupil = findPupil(filtered_eyeROI);
+            Point gazeDirection = Point(eyeROI.cols / 2, eyeROI.rows / 2) - currentPupil;
+
+            // Vérifier si la pupille est détectée
+            if (currentPupil.x != -1 && currentPupil.y != -1) {
+                pupil = currentPupil; // Mettre à jour les coordonnées de la pupille
+            }
 
             int gaze = 0;
             if (abs(gazeDirection.x) > abs(gazeDirection.y))
@@ -163,8 +172,9 @@ vector<int> detectAndDisplay(Mat frame_gray)
         }
     }
 
-    return {-1, -1, -1}; // Return -1 when no eye detected
+    return {pupil.x, pupil.y, -1}; // Returner les coordonnées de la pupille avec une direction de -1
 }
+
 
 Point findPupil(Mat eye)
 {
