@@ -19,6 +19,8 @@ CascadeClassifier eyes_cascade;
 int mouseX = 0;
 int mouseY = 0;
 Point previousPupil(-1, -1); // Coordonnées précédentes de la pupille
+int previousGaze = -1; // Direction du regard précédente
+bool isPupilDetected = false; // Indicateur de détection de la pupille
 
 int main(int argc, const char** argv)
 {
@@ -84,18 +86,26 @@ int main(int argc, const char** argv)
             break; // escape
         }
 
-        cout << "OUTPUT:\n  [";
-        for (auto i = gazeData.begin(); i != gazeData.end(); i++)
-        {
-            cout << *i;
-            if (i + 1 != gazeData.end())
-                cout << ", ";
-        }
-        cout << "]\n";
-
         // Update mouse position based on gaze direction
         Point gazeDirection(gazeData[0], gazeData[1]);
+
+        // Store the current pupil coordinates and gaze direction
+        previousPupil.x = gazeData[0];
+        previousPupil.y = gazeData[1];
+        previousGaze = gazeData[2];
+
         updateMousePosition(gazeDirection, screenMode.w, screenMode.h);
+	// Print gaze coordinates and direction
+    	cout << "OUTPUT:\n  [";
+    	for (auto i = gazeData.begin(); i != gazeData.end(); i++)
+    	{
+        
+		cout << *i;
+        	if (i + 1 != gazeData.end())
+
+            		cout << ", ";
+    	}
+    	cout << "]\n";
     }
 
     // Cleanup and quit SDL
@@ -125,10 +135,11 @@ vector<int> detectAndDisplay(Mat frame_gray)
     face_cascade.detectMultiScale(frame_gray, faces);
 
     if (faces.empty()) {
-        return {-1, -1, -1}; // No face detected
+        isPupilDetected = false; // Clear pupil detected flag
+        return {previousPupil.x, previousPupil.y, previousGaze}; // No face detected, return previous pupil coordinates and gaze direction
     }
 
-    Point pupil(-1, -1); // Initialiser les coordonnées de la pupille à (-1, -1)
+    Point pupil(-1, -1); // Initialize pupil coordinates
 
     for (const auto& face : faces)
     {
@@ -151,9 +162,13 @@ vector<int> detectAndDisplay(Mat frame_gray)
             Point currentPupil = findPupil(filtered_eyeROI);
             Point gazeDirection = Point(eyeROI.cols / 2, eyeROI.rows / 2) - currentPupil;
 
-            // Vérifier si la pupille est détectée
+            // Check if the pupil is detected
             if (currentPupil.x != -1 && currentPupil.y != -1) {
-                pupil = currentPupil; // Mettre à jour les coordonnées de la pupille
+                pupil = currentPupil; // Update pupil coordinates
+                isPupilDetected = true; // Set pupil detected flag
+            }
+            else {
+                isPupilDetected = false; // Clear pupil detected flag
             }
 
             int gaze = 0;
@@ -172,7 +187,7 @@ vector<int> detectAndDisplay(Mat frame_gray)
         }
     }
 
-    return {pupil.x, pupil.y, -1}; // Returner les coordonnées de la pupille avec une direction de -1
+    return {previousPupil.x, previousPupil.y, previousGaze}; // No eye detected, return previous pupil coordinates and gaze direction
 }
 
 
